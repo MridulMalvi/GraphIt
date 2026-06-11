@@ -1,5 +1,5 @@
 """
-Automated smoke-test for GraphIt using PHL_dataset.csv.
+Automated smoke-test for GraphIt using DataVisualizer_TestData.xlsx.
 Runs the app headlessly (no mainloop), exercises every core method,
 and prints PASS/FAIL for each check.
 """
@@ -14,10 +14,10 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="repla
 # Redirect stderr temporarily to suppress Tk warnings during headless test
 os.environ.setdefault("MPLBACKEND", "TkAgg")
 
-from data_visualizer_pro import DataVisualizerApp
+from data_visualizer import DataVisualizerApp
 import pandas as pd
 
-CSV_PATH = os.path.join(os.path.dirname(__file__), "PHL_dataset.csv")
+DATA_PATH = os.path.join(os.path.dirname(__file__), "DataVisualizer_TestData.xlsx")
 
 results = []
 
@@ -31,7 +31,7 @@ def check(name, condition, detail=""):
 def run_tests():
     print("=" * 65)
     print("  GraphIt — Automated Test Suite")
-    print("  Dataset: PHL_dataset.csv")
+    print("  Dataset: DataVisualizer_TestData.xlsx")
     print("=" * 65)
 
     # --- 1. Create app ---
@@ -42,20 +42,20 @@ def run_tests():
     check("App created", app is not None)
     check("Initial state: no data", app.df is None and app.filtered_df is None)
 
-    # --- 2. Load CSV ---
+    # --- 2. Load Excel ---
     print("\n[2] File Loading")
-    df = pd.read_csv(CSV_PATH)
+    df = pd.read_excel(DATA_PATH, engine="openpyxl")
     app.df = df
     app.filtered_df = df.copy()
-    app.current_file = CSV_PATH
+    app.current_file = DATA_PATH
     app._populate_table()
     app._update_info()
     app._populate_column_combos()
     root.update_idletasks()
 
-    check("CSV loaded", app.df is not None, f"{len(app.df)} rows × {len(app.df.columns)} cols")
-    check("Row count correct", len(app.df) == 5599, f"got {len(app.df)}")
-    check("Column count", len(app.df.columns) > 50, f"{len(app.df.columns)} columns")
+    check("Data loaded", app.df is not None, f"{len(app.df)} rows × {len(app.df.columns)} cols")
+    check("Row count correct", len(app.df) == 12, f"got {len(app.df)}")
+    check("Column count", len(app.df.columns) == 8, f"{len(app.df.columns)} columns")
 
     # --- 3. Data Preview ---
     print("\n[3] Data Preview / Table")
@@ -65,7 +65,7 @@ def run_tests():
     check("Table columns match df", len(cols_in_tree) == len(app.df.columns))
 
     info_text = app.info_label.cget("text")
-    check("Info label has row count", "5599" in info_text, info_text[:80])
+    check("Info label has row count", "12" in info_text, info_text[:80])
     check("Info label has col count", str(len(app.df.columns)) in info_text)
 
     # --- 4. Column combos populated ---
@@ -79,10 +79,10 @@ def run_tests():
 
     # --- 5. Column search ---
     print("\n[5] Column Search")
-    app.col_search_var.set("MASS")
+    app.col_search_var.set("Pro")
     root.update_idletasks()
     search_result = app.col_search_result.cget("text")
-    check("Search 'MASS' finds matches", "P_MASS" in search_result, search_result[:80])
+    check("Search 'Pro' finds matches", "Product" in search_result, search_result[:80])
 
     app.col_search_var.set("xyznotacolumn")
     root.update_idletasks()
@@ -91,16 +91,16 @@ def run_tests():
 
     # --- 6. Filtering ---
     print("\n[6] Data Filtering")
-    app.filter_col_var.set("P_DETECTION")
-    app.filter_val_var.set("Transit")
+    app.filter_col_var.set("Category")
+    app.filter_val_var.set("Electronics")
     app._apply_filter()
     root.update_idletasks()
-    n_transit = len(app.filtered_df)
-    check("Filter P_DETECTION=Transit", n_transit > 0 and n_transit < len(app.df),
-          f"{n_transit} rows")
+    n_filtered = len(app.filtered_df)
+    check("Filter Category=Electronics", n_filtered > 0 and n_filtered < len(app.df),
+          f"{n_filtered} rows")
 
     filter_info = app.filter_info_label.cget("text")
-    check("Filter info label updated", str(n_transit) in filter_info)
+    check("Filter info label updated", str(n_filtered) in filter_info)
 
     # Clear filter
     app._clear_filter()
@@ -108,26 +108,30 @@ def run_tests():
     check("Clear filter restores all rows", len(app.filtered_df) == len(app.df))
 
     # Numeric filter
-    app.filter_col_var.set("P_YEAR")
-    app.filter_val_var.set("2020")
+    app.filter_col_var.set("Sales")
+    app.filter_val_var.set("50000")
     app._apply_filter()
     root.update_idletasks()
-    n_2020 = len(app.filtered_df)
-    check("Numeric filter P_YEAR=2020", n_2020 > 0, f"{n_2020} rows")
+    n_sales = len(app.filtered_df)
+    check("Numeric filter Sales=50000", n_sales > 0, f"{n_sales} rows")
     app._clear_filter()
 
     # --- 7. Plotting — all 6 chart types ---
     print("\n[7] Chart Plotting (6 types)")
     # Set numeric columns for plotting
-    app.x_col_var.set("P_MASS")
-    app.y_col_var.set("P_RADIUS")
+    app.x_col_var.set("Product")
+    app.y_col_var.set("Sales")
 
     for chart in DataVisualizerApp.CHART_TYPES:
         app.chart_type_var.set(chart)
 
         # Pie chart needs a categorical column
         if chart == "Pie Chart":
-            app.x_col_var.set("P_TYPE")
+            app.x_col_var.set("Category")
+
+        # Histogram and Box Plot need a numeric column on the X-axis
+        if chart in ("Histogram", "Box Plot"):
+            app.x_col_var.set("Sales")
 
         app._plot_chart()
         root.update_idletasks()
@@ -136,11 +140,11 @@ def run_tests():
         has_plot = len(axes) > 0
         check(f"Plot: {chart}", has_plot)
 
-        # Restore numeric cols after pie
-        if chart == "Pie Chart":
-            app.x_col_var.set("P_MASS")
+        # Restore cols
+        app.x_col_var.set("Product")
+        app.y_col_var.set("Sales")
 
-    # --- 8. Save / Export (dry-run: just verify methods don't crash with no dialog) ---
+    # --- 8. Save / Export (dry-run) ---
     print("\n[8] Save & Export (method existence)")
     check("save_chart method exists", callable(getattr(app, "_save_chart", None)))
     check("export_csv method exists", callable(getattr(app, "_export_csv", None)))
@@ -171,22 +175,21 @@ def run_tests():
     print("\n[9] Error Handling")
     # Non-numeric column for scatter
     app.chart_type_var.set("Scatter Plot")
-    app.x_col_var.set("P_NAME")  # string column
-    app.y_col_var.set("P_RADIUS")
-    # This will show a messagebox error — we just confirm it doesn't crash
-    # We can't easily suppress messagebox in headless mode, so we test the validator directly
-    from data_visualizer_pro import DataVisualizerApp as DVA
+    app.x_col_var.set("Product")  # string column
+    app.y_col_var.set("Sales")
+    # We test the validator directly
+    from data_visualizer import DataVisualizerApp as DVA
     try:
-        DVA._assert_numeric(app.df, "P_NAME")
+        DVA._assert_numeric(app.df, "Product")
         check("Non-numeric assertion", False, "Should have raised ValueError")
     except ValueError:
         check("Non-numeric assertion raises ValueError", True)
 
     try:
-        DVA._assert_numeric(app.df, "P_MASS")
-        check("Numeric assertion passes for P_MASS", True)
+        DVA._assert_numeric(app.df, "Sales")
+        check("Numeric assertion passes for Sales", True)
     except ValueError:
-        check("Numeric assertion passes for P_MASS", False)
+        check("Numeric assertion passes for Sales", False)
 
     # --- 10. Dark mode toggle ---
     print("\n[10] Dark Mode Toggle")
