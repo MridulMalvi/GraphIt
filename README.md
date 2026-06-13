@@ -6,11 +6,7 @@ GraphIt is a modern, feature-rich desktop data visualization application built u
 
 ## 📸 Screenshots
 
-### Light Mode
-![GraphIt Light Mode UI](assets/screenshot_light.png)
-
-### Dark Mode
-![GraphIt Dark Mode UI](assets/screenshot_dark.png)
+![GraphIt  Mode UI](assets/screenshot_light.png)
 
 ---
 
