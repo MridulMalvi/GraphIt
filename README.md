@@ -95,6 +95,3 @@ python test_app.py
 
 ---
 
-## 👤 License & Copyright
-
-Developed by Mridul Malvi. Free to use, adapt, and distribute under the repository's open source terms.
